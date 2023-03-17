@@ -280,8 +280,8 @@ void read_temp()
 	//then wait 80 ms as the datasheet says to do 
 	_delay_ms(80);
 
-	uint32_t temperature = 0;
-	uint32_t humidity = 0;
+	int32_t temperature = 0;
+	int32_t humidity = 0;
 	i2c_start_read();
 	uint8_t status = i2c_read(ACK);
 
@@ -296,9 +296,9 @@ void read_temp()
 		buffer[i] = i2c_read( i == 5 ? NACK : ACK);
 
 	
-	humidity = (int32_t)buffer[0] << 12 | (int32_t)buffer[1] << 4 | ((uint32_t)buffer[2] & 0b11110000) >> 4;
+	humidity = (uint32_t)buffer[0] << 12 | (uint32_t)buffer[1] << 4 | ((uint32_t)buffer[2] & 0b11110000) >> 4;
 	temperature = ((uint32_t)buffer[2] & 0xF) << 16 | (uint32_t)buffer[3] << 8 | (uint32_t)buffer[4];
-	humidity = (humidity* 100) >> 20 ;
+	humidity = (float)humidity / 1048576 * 100;
 	temperature = ((temperature * 25) >> 17) - 50;
 	uart_printstr("Temperature: ");
 	uart_putnbr(temperature);
