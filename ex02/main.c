@@ -33,6 +33,8 @@
 #define TEMP_TRIGGER_READING_PARAM1 0x33
 #define TEMP_TRIGGER_READING_PARAM2 0x00
 
+#define TEMP_GET_STATUS_COMMAND	0x71
+
 #define ACK 1
 #define NACK 0
 
@@ -50,6 +52,7 @@ void i2c_start_read(void);
 char i2c_read(uint8_t ack);
 void print_hex_value(unsigned char c);
 void i2c_init(void);
+uint8_t get_temp_status(void);
 
 
 
@@ -70,6 +73,13 @@ void i2c_send_full_command(uint8_t command, uint8_t param1, uint8_t param2)
 	i2c_write(command);
 	i2c_write(param1);
 	i2c_write(param2);
+	i2c_stop();
+}
+
+void i2c_send_single_byte(uint8_t byte)
+{
+	i2c_start_write();
+	i2c_write(byte);
 	i2c_stop();
 }
 
@@ -267,8 +277,24 @@ void temp_init()
 
 	// uart_printstr("going into write mode\r\n");
 	//if write mode isnt on, go in write mode
-	i2c_send_full_command(TEMP_INIT_COMMAND, TEMP_INIT_COMMAND_PARAM1, TEMP_INIT_COMMAND_PARAM2);
-	_delay_ms(10);
+	if ((get_temp_status() & (1 << 3)) == 0) // if sensor isnt calibrated
+	{
+		i2c_send_full_command(TEMP_INIT_COMMAND, TEMP_INIT_COMMAND_PARAM1, TEMP_INIT_COMMAND_PARAM2);
+		_delay_ms(10);
+	}
+
+}
+
+uint8_t get_temp_status(void)
+{
+	uint8_t ret;
+	i2c_start_write();
+	i2c_write(TEMP_GET_STATUS_COMMAND);
+	i2c_start_read();
+
+	ret = i2c_read(ACK);
+
+	return ret;
 }
 
 void read_temp()
@@ -297,8 +323,10 @@ void read_temp()
 
 	
 	humidity = (uint32_t)buffer[0] << 12 | (uint32_t)buffer[1] << 4 | ((uint32_t)buffer[2] & 0b11110000) >> 4;
+
 	temperature = ((uint32_t)buffer[2] & 0xF) << 16 | (uint32_t)buffer[3] << 8 | (uint32_t)buffer[4];
-	humidity = (float)humidity / 1048576 * 100;
+
+	humidity = (humidity * 25) >> 18;
 	temperature = ((temperature * 25) >> 17) - 50;
 	uart_printstr("Temperature: ");
 	uart_putnbr(temperature);
